@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>War Thunder Armor Lab</title>
+    <style>
+        :root {
+            --bg: #121212;
+            --card: #1e1e1e;
+            --accent: #ffa500;
+            --text: #e0e0e0;
+            --green: #2ecc71;
+            --red: #e74c3c;
+            --yellow: #f1c40f;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-bottom: 30px;
+        }
+
+        .app-container { width: 100%; max-width: 500px; padding: 10px; box-sizing: border-box; }
+        header { text-align: center; padding: 10px 0; }
+        header h1 { margin: 0; font-size: 1.4rem; color: var(--accent); }
+
+        .display-area {
+            position: relative;
+            background: #000;
+            border-radius: 12px;
+            border: 2px solid #333;
+            margin-bottom: 15px;
+            overflow: hidden;
+        }
+
+        canvas { display: block; width: 100%; height: 200px; }
+
+        #result-overlay {
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            background: rgba(0,0,0,0.85);
+            padding: 10px;
+            border-top: 1px solid #444;
+            text-align: center;
+        }
+
+        #outcome { margin: 0; font-size: 1.2rem; font-weight: bold; }
+        .mini-stats { display: flex; justify-content: space-around; font-size: 0.85rem; margin-top: 5px; }
+
+        .controls { display: flex; flex-direction: column; gap: 10px; }
+        section { background: var(--card); padding: 12px; border-radius: 10px; }
+        label { display: block; font-size: 0.7rem; color: #888; margin-bottom: 5px; text-transform: uppercase; }
+        
+        select {
+            width: 100%; background: #333; color: white; border: 1px solid #444;
+            padding: 8px; border-radius: 6px; font-size: 0.95rem;
+        }
+
+        .slider-box { display: flex; flex-direction: column; }
+        .label-row { display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 4px; }
+        .label-row b { color: var(--accent); }
+
+        input[type=range] { -webkit-appearance: none; width: 100%; height: 4px; background: #444; outline: none; accent-color: var(--accent); }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <header><h1>War Thunder Armor Lab</h1></header>
+
+    <div class="display-area">
+        <canvas id="simCanvas"></canvas>
+        <div id="result-overlay">
+            <div id="outcome">READY</div>
+            <div class="mini-stats">
+                <span>Pen: <b id="pen-val">0</b>mm</span>
+                <span>Eff: <b id="eff-val">0</b>mm</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <section>
+            <label>1. Select Tank (Presets)</label>
+            <select id="tankSelect">
+                <option value="custom">-- Custom Settings --</option>
+                <optgroup label="USA">
+                    <option value="M4A3">M4A3 Sherman (63mm)</option>
+                    <option value="M26">M26 Pershing (101mm)</option>
+                    <option value="M1A2">M1A2 Abrams (Composite 600mm)</option>
+                </optgroup>
+                <optgroup label="Germany">
+                    <option value="PzIV">Pz.IV Ausf. G (80mm)</option>
+                    <option value="TigerE">Tiger E (102mm)</option>
+                    <option value="PantherA">Panther A (80mm @ 55°)</option>
+                    <option value="TigerII">Tiger II H (150mm)</option>
+                    <option value="Leo2A6">Leopard 2A6 (Composite 650mm)</option>
+                </optgroup>
+                <optgroup label="USSR">
+                    <option value="T34">T-34-85 (45mm @ 60°)</option>
+                    <option value="IS2">IS-2 (100mm)</option>
+                    <option value="IS3">IS-3 (110mm Pike)</option>
+                    <option value="T54">T-54 (100mm @ 60°)</option>
+                    <option value="T80BVM">T-80BVM (Relikt 800mm)</option>
+                </optgroup>
+                <optgroup label="UK/Other">
+                    <option value="Churchill">Churchill Mk VII (152mm)</option>
+                    <option value="Centurion">Centurion Mk 3 (76mm)</option>
+                    <option value="Challenger2">Challenger 2 (Composite 700mm)</option>
+                    <option value="MAUS">MAUS (200mm)</option>
+                    <option value="B1bis">B1 bis (60mm)</option>
+                    <option value="L3">L3/33 CC (15mm)</option>
+                    <option value="TOG2">TOG II (76mm)</option>
+                </optgroup>
+            </select>
+        </section>
+
+        <section>
+            <label>2. Ammo Type</label>
+            <select id="shellType">
+                <option value="AP">AP (Standard)</option>
+                <option value="APCBC">APCBC (Better Angle)</option>
+                <option value="APCR">APCR (High Pen / Low Angle)</option>
+                <option value="APFSDS">APFSDS (Modern Dart)</option>
+                <option value="HEAT">HEAT (Chemical)</option>
+            </select>
+        </section>
+
+        <section class="slider-box">
+            <div class="label-row"><span>Armor Material</span> <b id="matName">RHA</b></div>
+            <select id="armorType">
+                <option value="RHA">Rolled Homogeneous (1.0x)</option>
+                <option value="CHA">Cast Armor (0.90x)</option>
+                <option value="HHS">High Hardness Steel (1.2x)</option>
+                <option value="Composite">Modern Composite (1.5x)</option>
+            </select>
+        </section>
+
+        <section class="slider-box">
+            <div class="label-row"><span>Thickness</span> <b id="thickText">100</b>mm</div>
+            <input type="range" id="thickSlider" min="10" max="800" value="100">
+        </section>
+
+        <section class="slider-box">
+            <div class="label-row"><span>Impact Angle</span> <b id="angleText">0</b>°</div>
+            <input type="range" id="angleSlider" min="0" max="85" value="0">
+        </section>
+
+        <section class="slider-box">
+            <div class="label-row"><span>Distance</span> <b id="distText">0</b>m</div>
+            <input type="range" id="distSlider" min="0" max="3000" step="100" value="0">
+        </section>
+    </div>
+</div>
+
+<script>
+    const TANK_DATA = {
+        M4A3: { t: 63, a: 56, m: "RHA" },
+        M26: { t: 101, a: 46, m: "CHA" },
+        M1A2: { t: 600, a: 0, m: "Composite" },
+        PzIV: { t: 80, a: 10, m: "RHA" },
+        TigerE: { t: 102, a: 0, m: "RHA" },
+        PantherA: { t: 80, a: 55, m: "RHA" },
+        TigerII: { t: 150, a: 50, m: "RHA" },
+        Leo2A6: { t: 650, a: 0, m: "Composite" },
+        T34: { t: 45, a: 60, m: "RHA" },
+        IS2: { t: 100, a: 60, m: "CHA" },
+        IS3: { t: 110, a: 61, m: "RHA" },
+        T54: { t: 100, a: 60, m: "RHA" },
+        T80BVM: { t: 800, a: 0, m: "Composite" },
+        Churchill: { t: 152, a: 0, m: "CHA" },
+        Centurion: { t: 76, a: 57, m: "RHA" },
+        Challenger2: { t: 700, a: 0, m: "Composite" },
+        MAUS: { t: 200, a: 35, m: "RHA" },
+        B1bis: { t: 60, a: 0, m: "CHA" },
+        L3: { t: 15, a: 0, m: "RHA" },
+        TOG2: { t: 76, a: 0, m: "RHA" }
+    };
+
+    const SHELL_LIB = {
+        AP: { pen: 180, decay: 0.08, norm: 5, ricochet: 70, type: 'kinetic' },
+        APCBC: { pen: 210, decay: 0.05, norm: 6, ricochet: 72, type: 'kinetic' },
+        APCR: { pen: 320, decay: 0.25, norm: 2, ricochet: 65, type: 'kinetic' },
+        APFSDS: { pen: 580, decay: 0.02, norm: 8, ricochet: 82, type: 'kinetic' },
+        HEAT: { pen: 450, decay: 0, norm: 0, ricochet: 75, type: 'chemical' }
+    };
+
+    const ARMOR_LIB = { RHA: 1.0, CHA: 0.9, HHS: 1.2, Composite: 1.5 };
+
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function updateFromPreset() {
+        const val = document.getElementById('tankSelect').value;
+        if (val === 'custom') return;
+        const tank = TANK_DATA[val];
+        document.getElementById('thickSlider').value = tank.t;
+        document.getElementById('angleSlider').value = tank.a;
+        document.getElementById('armorType').value = tank.m;
+        runSimulation();
+    }
+
+    function runSimulation() {
+        const shell = SHELL_LIB[document.getElementById('shellType').value];
+        const armorMult = ARMOR_LIB[document.getElementById('armorType').value];
+        const baseThick = parseInt(document.getElementById('thickSlider').value);
+        const angle = parseInt(document.getElementById('angleSlider').value);
+        const dist = parseInt(document.getElementById('distSlider').value);
+
+        let currentPen = shell.type === 'kinetic' ? shell.pen * Math.pow((1 - shell.decay), (dist / 500)) : shell.pen;
+        let rad = (Math.max(0, angle - shell.norm) * Math.PI) / 180;
+        let effThick = (baseThick / Math.cos(rad)) / armorMult;
+
+        document.getElementById('thickText').innerText = baseThick;
+        document.getElementById('angleText').innerText = angle;
+        document.getElementById('distText').innerText = dist;
+        document.getElementById('pen-val').innerText = Math.round(currentPen);
+        document.getElementById('eff-val').innerText = Math.round(effThick);
+
+        const out = document.getElementById('outcome');
+        let color = angle >= shell.ricochet ? "#f1c40f" : (currentPen >= effThick ? "#2ecc71" : "#e74c3c");
+        out.innerText = angle >= shell.ricochet ? "RICOCHET!" : (currentPen >= effThick ? "PENETRATED" : "STOPPED");
+        out.style.color = color;
+
+        draw(angle, baseThick, color);
+    }
+
+    function draw(angle, thick, color) {
+        canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight;
+        const cx = canvas.width/2, cy = canvas.height/2;
+        ctx.clearRect(0,0,canvas.width, canvas.height);
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(angle * Math.PI / 180);
+        ctx.fillStyle = "#555";
+        ctx.fillRect(-thick/10, -70, thick/5, 140);
+        ctx.strokeStyle = "#fff";
+        ctx.strokeRect(-thick/10, -70, thick/5, 140);
+        ctx.restore();
+        ctx.beginPath(); ctx.setLineDash([5, 5]); ctx.strokeStyle = color;
+        ctx.moveTo(0, cy); ctx.lineTo(cx, cy); ctx.stroke();
+    }
+
+    document.getElementById('tankSelect').onchange = updateFromPreset;
+    document.querySelectorAll('input, select').forEach(el => el.oninput = runSimulation);
+    window.onload = runSimulation;
+</script>
+</body>
+</html>
